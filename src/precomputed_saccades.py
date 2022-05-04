@@ -12,7 +12,6 @@ torch.manual_seed(0)
 
 def conver_tensor_to_plot(tensor, mean, std):
     tensor = tensor.numpy().transpose((1, 2, 0))
-    # mean = np.array([0.485, 0.456, 0.406])
     image = std * tensor + mean
     image = np.clip(image, 0, 1)
     if np.shape(image)[2] == 1:
@@ -33,22 +32,13 @@ class Generator(nn.Module):
             nn.ConvTranspose2d(nz, n_hid_feat_fact * 8, 4, 1, 0, bias=True),
             nn.BatchNorm2d(n_hid_feat_fact * 8),
             nn.ReLU(True),
-            # state size. (ngf*8) x 4 x 4
             nn.ConvTranspose2d(n_hid_feat_fact * 8, n_hid_feat_fact * 4, 4, 2, 1, bias=True),
             nn.BatchNorm2d(n_hid_feat_fact * 4),
             nn.ReLU(True),
-            # state size. (ngf*4) x 8 x 8
             nn.ConvTranspose2d(n_hid_feat_fact * 4, n_hid_feat_fact * 2, 4, 2, 1, bias=True),
-            # nn.BatchNorm2d(n_hid_feat_fact * 2),
             nn.ReLU(True),
-            # state size. (ngf*2) x 16 x 16
             nn.ConvTranspose2d(n_hid_feat_fact * 2, nc, 4, 2, 1, bias=True),
-            # nn.BatchNorm2d(n_hid_feat_fact),
-            # nn.ReLU(True),
-            # state size. (ngf) x 32 x 32
-            # nn.ConvTranspose2d(n_hid_feat_fact, nc, 4, 2, 1, bias=False),
-            # nn.Tanh()
-            # state size. (nc) x 64 x 64
+            # (ngf) x 32 x 32
         )
 
     def forward(self, input):
@@ -65,8 +55,6 @@ channels = 3
 vgg_output_size = 1000
 num_latent_fovea = 1024
 
-decide_saccades = torchvision.models.vgg11(pretrained=True, progress=True, num_classes=1000)
-
 fovea_to_z = torchvision.models.vgg11(pretrained=True, progress=True, num_classes=1000)
 fovea_to_z.features = nn.Sequential(*[fovea_to_z.features[i] for i in range(16)])
 fovea_to_z.classifier[-1] = nn.Linear(fovea_to_z.classifier[-1].in_features, num_latent_fovea)
@@ -75,7 +63,6 @@ vision_memory = torch.nn.LSTM(num_latent_fovea + 2, lstm_h_vis_mem, num_layers=1
 gen = Generator(nz=lstm_h_vis_mem)
 
 if torch.cuda.is_available():
-    decide_saccades.cuda()
     saccade_generator.cuda()
     gen.cuda()
     fovea_to_z.cuda()
@@ -97,16 +84,16 @@ transform = torchvision.transforms.Compose([
                                      std=std)
 ])
 
-
 optimizer = torch.optim.Adam(itertools.chain(*[fovea_to_z.parameters(), vision_memory.parameters(), gen.parameters()]), lr=0.0001)
 
 
 
 img_original = Image.open('./data/hinton_face.png').resize((224, 224))
-img_full_input = img_original.resize((32, 32))
+img_full_downgraded = img_original.resize((32, 32))
+img_full_downgraded_t = transform(img_full_downgraded)
 
-img_input_resize = transform_w_resize(img_full_input).unsqueeze(0)
-img_input = transform(img_full_input)
+
+
 lstm_hidden = torch.zeros(1, 1, lstm_hidden_size).cuda()
 lstm_cell = (0,torch.zeros(1, 1, lstm_cell_size).cuda())
 
@@ -116,12 +103,6 @@ lstm_cell = (0,torch.zeros(1, 1, lstm_cell_size).cuda())
 
 for i in range(10000):
     optimizer.zero_grad()
-    # vgg_output = net(img_input_resize.cuda()).unsqueeze(dim=0)
-    # (h1, c1) = saccade_generator(vgg_output, (lstm_hidden.cuda(), lstm_cell.cuda()))
-    # # mapping function from hidden to x, y, w, h
-    # x, y = [torch.tanh((torch.sigmoid(torch.sum(i)))).item() for i in h1[0][0].split(1024//2)]
-    # x, y = torch.tensor([0.5]).cuda(), torch.tensor([0.5]).cuda()  #np.random.uniform(0.49, 0.50), np.random.uniform(0.49, 0.50)
-
     x, y = torch.tensor([np.random.uniform(0.2, 0.8)]).cuda(), torch.tensor([np.random.uniform(0.2, 0.8)]).cuda()
     h, w = 32, 32
     saccade_img = img_original.crop((int(x*img_original.size[0]), int(y*img_original.size[1]),int(x*img_original.size[0]) + h, int(y*img_original.size[1]) + w))
@@ -133,7 +114,7 @@ for i in range(10000):
     (lstm_hidden, lstm_cell) = vision_memory(latent_input.detach().unsqueeze(dim=0).unsqueeze(0), (lstm_hidden.detach(), lstm_cell[1].detach()))
     rec_img = gen(lstm_hidden.squeeze(0))
 
-    diff = torch.square(rec_img - img_input.unsqueeze(0).cuda())
+    diff = torch.square(rec_img - img_full_downgraded_t.unsqueeze(0).cuda())
 
     loss = torch.sum(diff)
     loss.backward()
@@ -144,7 +125,7 @@ for i in range(10000):
         img_plot = conver_tensor_to_plot(rec_img.cpu().squeeze(0).detach(), mean, std)
         plt.imshow(img_plot)
         plt.show()
-        plt.imshow(conver_tensor_to_plot(img_input, mean, std))
+        plt.imshow(conver_tensor_to_plot(img_full_downgraded_t, mean, std))
         plt.show()
         plt.savefig('./prova.png')
 
