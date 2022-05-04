@@ -19,7 +19,7 @@ config = Config(stop_when_train_acc_is=95,
                 project_name='Train-Sort-of-CLEVR',
                 network_name='RelationNet',
                 batch_size=64,
-                weblogger=2,  #set to "2" if you want to log into neptune client
+                weblogger=2,  #set to "2" if you want to log into neptune client - if you do, you need to have an API token set (see neptune website). Otherwise put to 0.
                 pretraining='vanilla',
                 continue_train=False,
                 cuda_device_num=2,

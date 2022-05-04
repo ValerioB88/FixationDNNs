@@ -31,8 +31,7 @@ class Config:
                 print(f'\t{i} : ' + ef.inverse + f'{PARAMS[i]}' + rs.inverse)
 
         if self.weblogger == 2:
-            neptune_run = neptune.init(f'valeriobiscione/{self.project_name}',
-                                       api_token='eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiI4N2Y2NzVkYS04NDYzLTQ2MjQtYTBmYS1hZGI1NzFmZjcwNzIifQ==')
+            neptune_run = neptune.init(f'valeriobiscione/{self.project_name}')
             neptune_run["sys/tags"].add(list_tags)
             neptune_run["parameters"] = PARAMS
             self.weblogger = neptune_run

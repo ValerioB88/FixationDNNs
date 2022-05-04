@@ -42,12 +42,6 @@ config.optimizer = torch.optim.Adam(config.net.parameters(),
                                     lr=config.learning_rate,
                                     weight_decay=config.weight_decay)
 
-# train_dataset = add_compute_stats(RunTimeSOCLEVR)(img_size=config.img_size, num_colors=config.num_colors, stats={'mean':[0, 0, 0], 'std':[1, 1, 1]})
-
-#stats={'mean':[0, 0, 0], 'std':[1, 1, 1]})
-# train_dataset = add_compute_stats(StaticDataSOCLVR2)(folder='./data/sort-of-clevr2/sort-of-clevr.pickle', stats={'mean':[0, 0, 0], 'std':[1, 1, 1]})#size=9800, img_size=config.img_size, num_colors=config.num_colors) #stats={'mean':[0, 0, 0], 'std':[1, 1, 1]})
-#
-#
 train_dataset = StaticDataSOCLEVR_saccades(path=None, type_rel=config.type_rel, num_q_per_img=-1, num_images=9800, img_size=config.img_size, num_colors=config.num_colors)
 train_dataset.stats = {'mean': [0, 0, 0], 'std': [1, 1, 1]}
 train_dataset.transform = torchvision.transforms.Compose([torchvision.transforms.ToTensor()])
@@ -70,11 +64,6 @@ test_rel.transform = torchvision.transforms.Compose([torchvision.transforms.ToTe
 test_rel.name_ds = config.type_rel
 
 test_datasets.append(test_rel)
-
-# test_datasets.append(add_compute_stats(StaticDataSOCLEVR_saccades)(name_ds='relational', type_rel='rel', num_q_per_img=-1, num_images=200, img_size=config.img_size, num_colors=config.num_colors, stats=train_dataset.stats))
-
-# test_dataset = add_compute_stats(StaticDataSOCLVR2)(train=False, folder='./data/sort-of-clevr2/sort-of-clevr.pickle', stats=train_dataset.stats)#size=9800, img_size=config.img_size, num_colors=config.num_colors) #stats={'mean':[0, 0, 0], 'std':[1, 1, 1]})
-
 
 test_loaders = [DataLoader(td,
                           batch_size=config.batch_size,
@@ -116,34 +105,18 @@ all_cb = [
     ProgressBar(l=len(train_dataset), batch_size=config.batch_size, logs_keys=['ema_loss', 'ema_acc']),
     PrintNeptune(id='ema_loss', plot_every=10, weblogger=config.weblogger),
     PrintNeptune(id='ema_acc', plot_every=10, weblogger=config.weblogger),
-    # Either train for 10 epochs (which is more than enough for convergence):
+    # Either train for 10 epochs
     # TriggerActionWhenReachingValue(mode='max', patience=1, value_to_reach=10, check_every=10, metric_name='epoch', action=stop, action_name='10epochs'),
 
-    # Or explicitely traing until 90% accuracy or convergence:
+    # Or explicitely traing until 9X% accuracy or convergence:
     TriggerActionWhenReachingValue(mode='max', patience=20, value_to_reach=config.stop_when_train_acc_is/100, check_every=10, metric_name='ema_acc', action=stop, action_name=f'goal{config.stop_when_train_acc_is}%'),
-
-    # TriggerActionWithPatience(mode='min', min_delta=0.01,
-    #                           patience=config.patience_stagnation,
-    #                           min_delta_is_percentage=False,
-    #                           metric_name='ema_loss',
-    #                           check_every=10,
-    #                           triggered_action=stop,
-    #                           action_name='Early Stopping',
-    #                           weblogger=config.weblogger),
-    #
 
     # PlateauLossLrScheduler(config.optimizer, patience=1000, check_batch=True, loss_metric='ema_loss'),
 
     *[DuringTrainingTest(testing_loaders=test_ds, auto_increase=1, weblogger=config.weblogger, log_text='test during train', use_cuda=config.use_cuda, call_run=call_run, plot_samples_corr_incorr=True,  callbacks=[
         PrintNeptune(id='ca_acc', plot_every=np.inf, log_prefix='test_EVAL&TRAIN_', weblogger=config.weblogger),
-         PrintConsole(id='ca_acc', endln=" / ", plot_every=np.inf, plot_at_end=True),
-         PlotImagesEveryOnceInAWhile(config.weblogger, test_ds.dataset,  plotting_fun=plot_crop_corr_incorr, plot_every=np.inf, plot_only_n_times=1, plot_at_the_end=True, max_images=10, text='')]) for test_ds in test_loaders]
-
-
-
-    # DuringTrainingTest(testing_loaders=test_loaders[1], auto_increase=1, weblogger=config.weblogger, log_text='test during train', use_cuda=config.use_cuda, call_run=call_run, plot_samples_corr_incorr=True,  callbacks=[
-    #     PrintNeptune(id='ca_acc', plot_every=np.inf, log_prefix='test_EVAL&TRAIN_', weblogger=config.weblogger),
-    #     PrintConsole(id='ca_acc', endln=" / ", plot_every=np.inf, plot_at_end=True)]),
+        PrintConsole(id='ca_acc', endln=" / ", plot_every=np.inf, plot_at_end=True),
+        PlotImagesEveryOnceInAWhile(config.weblogger, test_ds.dataset,  plotting_fun=plot_crop_corr_incorr, plot_every=np.inf, plot_only_n_times=1, plot_at_the_end=True, max_images=10, text='')]) for test_ds in test_loaders]
 
 ]
 
@@ -152,10 +125,3 @@ all_cb.append(SaveModel(config.net, config.model_output_filename, epsilon_loss=0
 
 net, logs = call_run(train_loader, True, all_cb)
 config.weblogger.stop() if config.weblogger else None
-
-# network_names = ['vonenet-resnet50'] #alexnet', 'inception_v3', 'densenet201', 'vgg19bn', 'resnet152', 'vonenet-resnet50', 'cornet-s', 'vonenet-cornets']  #
-# pt = ['vanilla']
-# all_exps = (product(network_names, pt))
-# arguments = list((dict(network_name=i[0],
-#                        pt=i[1]) for i in all_exps))
-# [train(**a) for a in arguments]
